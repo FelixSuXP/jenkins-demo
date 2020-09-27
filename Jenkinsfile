@@ -2,10 +2,7 @@ pipeline{
       // 定义groovy脚本中使用的环境变量
       environment{
         // 将构建任务中的构建参数转换为环境变量
-        IMAGE_TAG =  sh(returnStdout: true,script: 'echo $image_tag').trim()
-        ORIGIN_REPO =  sh(returnStdout: true,script: 'echo $origin_repo').trim()
-        REPO =  sh(returnStdout: true,script: 'echo $repo').trim()
-        BRANCH =  sh(returnStdout: true,script: 'echo $branch').trim()
+        IMAGE_TAG = sh(script: 'date +%Y%m%d%H%M_${GIT_COMMIT}', returnStdout: true).trim()
       }
 
       // 定义本次构建使用哪个标签的构建环境，本示例中为 “slave-pipeline”
@@ -20,7 +17,7 @@ pipeline{
         // 定义第一个stage， 完成克隆源码的任务
         stage('Git'){
           steps{
-            git branch: '${BRANCH}', credentialsId: '', url: 'https://github.com/AliyunContainerService/jenkins-demo.git'
+            git branch: 'master', credentialsId: '', url: 'https://github.com/FelixSuXP/jenkins-demo.git'
           }
         }
 
@@ -38,7 +35,7 @@ pipeline{
         stage('Image Build And Publish'){
           steps{
               container("kaniko") {
-                  sh "kaniko -f `pwd`/Dockerfile -c `pwd` --destination=${ORIGIN_REPO}/${REPO}:${IMAGE_TAG} --skip-tls-verify"
+                  sh "kaniko -f `pwd`/Dockerfile -c `pwd` --destination=registry-vpc.cn-hangzhou.aliyuncs.com/gravity-gold/ack-jenkins-demo:${IMAGE_TAG} --skip-tls-verify"
               }
           }
         }
@@ -47,7 +44,7 @@ pipeline{
         stage('Deploy to Kubernetes') {
           steps {
             container('kubectl') {
-              step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://kubernetes.default.svc.cluster.local:443', credentialsId:'k8sCertAuth', config: 'deployment.yaml',variableState: 'ORIGIN_REPO,REPO,IMAGE_TAG'])
+              step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: 'https://kubernetes.default.svc.cluster.local:443', credentialsId:'k8sCertAuth', config: 'deployment.yaml',variableState: 'IMAGE_TAG'])
             }
           }
         }
